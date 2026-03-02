@@ -1,0 +1,623 @@
+<!DOCTYPE html><html lang="th"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการสต็อกและเช่าชุด - V3.7.0 (ปรับปรุงสถานะจอง)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; }
+        .pulse-red { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style></head><body class="bg-gray-100 p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">ระบบจัดการสต็อกและเช่าชุด</h1>
+            
+            <div class="flex gap-2">
+                <input type="month" id="reportMonth" class="border p-2 rounded-lg text-sm" onchange="render()">
+                <button onclick="exportToExcelAll()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition flex items-center gap-2">
+                    📊 Export ทั้งหมด (Excel)
+                </button>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="bg-blue-600 text-white p-4 rounded-xl shadow-lg border-b-4 border-blue-800">
+                <p class="text-xs opacity-80">รายได้จากการเช่า (ทั้งหมด)</p>
+                <h2 id="totalRentIncome" class="text-2xl font-bold">0.-</h2>
+            </div>
+            <div class="bg-purple-600 text-white p-4 rounded-xl shadow-lg border-b-4 border-purple-800">
+                <p class="text-xs opacity-80">เงินลงทุนสะสม</p>
+                <h2 id="totalInvestment" class="text-2xl font-bold">0.-</h2>
+            </div>
+            <div class="bg-red-500 text-white p-4 rounded-xl shadow-lg border-b-4 border-red-700">
+                <p class="text-xs opacity-80">รายจ่ายรวม (ทั้งหมด)</p>
+                <h2 id="totalExpenses" class="text-2xl font-bold">0.-</h2>
+            </div>
+            <div class="bg-green-600 text-white p-4 rounded-xl shadow-lg border-b-4 border-green-800">
+                <p class="text-xs opacity-80">กำไรสุทธิ (ทั้งหมด)</p>
+                <h2 id="netProfit" class="text-2xl font-bold">0.-</h2>
+            </div>
+            <div class="bg-gray-800 text-white p-4 rounded-xl shadow-lg border-b-4 border-gray-950">
+                <p class="text-xs opacity-80">เงินคงเหลือ (ทุน+รายได้-จ่าย)</p>
+                <h2 id="totalBalance" class="text-2xl font-bold">0.-</h2>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border-t-4 border-blue-600">
+            <h1 id="formTitle" class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                📦 เพิ่ม/แก้ไข สต็อกสินค้า
+            </h1>
+            <input type="hidden" id="editIndex" value="-1">
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="col-span-2 md:col-span-1">
+                    <label class="text-xs text-gray-500">ชื่อสินค้า</label>
+                    <input type="text" id="name" placeholder="เช่น ชุดราตรี" class="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-400">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">ไซส์ (เอว/อก)</label>
+                    <input type="text" id="size" placeholder="S, M, L / เอว 26..." class="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-400">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">หมวดหมู่</label>
+                    <input type="text" id="category" placeholder="เช่น งานแต่ง" class="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-400">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 font-bold text-blue-600">ราคา 1 วัน</label>
+                    <input type="number" id="price1" class="w-full border p-2 rounded-lg">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 font-bold text-blue-600">ราคา 3 วัน</label>
+                    <input type="number" id="price3" class="w-full border p-2 rounded-lg">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 font-bold text-blue-600">ราคา 5 วัน</label>
+                    <input type="number" id="price5" class="w-full border p-2 rounded-lg">
+                </div>
+                <div class="bg-blue-50 p-1 rounded-lg border border-blue-100">
+                    <label class="text-xs text-blue-600 font-bold ml-1">ค่ามัดจำชุด (บาท)</label>
+                    <input type="number" id="defaultDeposit" placeholder="ยอดมัดจำชุด" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-400">
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="text-xs text-gray-500">รูปภาพสินค้า</label>
+                    <input type="file" id="imageInput" class="w-full border p-1 rounded-lg text-sm" accept="image/*">
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button id="submitBtn" onclick="addItem()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">บันทึกสต็อก</button>
+                <button id="cancelBtn" onclick="clearForm()" class="hidden bg-gray-400 text-white px-6 py-2 rounded-lg hover:bg-gray-500 transition">ยกเลิก</button>
+            </div>
+        </div>
+
+        <div id="bookingFormSection" class="hidden bg-orange-50 p-6 rounded-xl border-2 border-orange-200 shadow-lg mb-8 transition-all">
+            <h2 class="text-xl font-bold mb-4 text-orange-800 flex items-center gap-2">
+                📝 บันทึกการจอง: <span id="targetItemName" class="underline"></span>
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <input type="hidden" id="bookingItemId">
+                
+                <div class="md:col-span-2">
+                    <label class="block text-xs text-gray-500">ชื่อลูกค้า</label>
+                    <input type="text" id="custName" class="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+                
+                <div>
+                    <label class="block text-xs text-gray-500">จังหวัด</label>
+                    <input type="text" id="custProvince" class="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500">เบอร์โทรศัพท์</label>
+                    <input type="text" id="custPhone" class="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs text-gray-500">เลขบัตรประชาชน (สำหรับสัญญา)</label>
+                    <input type="text" id="custIdCard" class="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+                
+                <div>
+                    <label class="block text-xs text-gray-500">วันที่เริ่มเช่า</label>
+                    <input type="date" id="startDate" onchange="autoCalculateDays()" class="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500">วันที่คืนชุด</label>
+                    <input type="date" id="endDate" onchange="autoCalculateDays()" class="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+                
+                <div class="bg-white p-2 rounded-lg border border-orange-200 shadow-inner">
+                    <label class="block text-xs font-bold text-orange-600">จำนวนวันจอง</label>
+                    <input type="number" id="bookingDays" oninput="manualCalculatePrice()" class="w-full text-lg font-bold text-center outline-none" value="0">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 font-bold text-orange-700">ราคาเช่า (อัตโนมัติ)</label>
+                    <input type="number" id="rentPrice" class="w-full border p-2 rounded-lg bg-white font-bold text-blue-600">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 font-bold text-orange-700">ค่ามัดจำ (อัตโนมัติ)</label>
+                    <input type="number" id="deposit" class="w-full border p-2 rounded-lg bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs text-red-500 font-bold">ค่าส่ง (คีย์เอง)</label>
+                    <input type="number" id="shipping" class="w-full border p-2 rounded-lg border-red-200 focus:ring-2 focus:ring-red-400" placeholder="0">
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="saveBooking()" class="bg-orange-600 text-white px-8 py-2 rounded-lg font-semibold hover:bg-orange-700 transition shadow-md">ยืนยันการจอง</button>
+                <button onclick="closeBooking()" class="bg-gray-400 text-white px-8 py-2 rounded-lg hover:bg-gray-500 transition">ปิดหน้าต่างนี้</button>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-md mb-8 border-t-4 border-red-500">
+            <h3 class="font-bold text-red-700 mb-4">💸 บันทึกการเงิน (ลงทุน / รายจ่าย)</h3>
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
+                <input type="date" id="expDate" class="border p-2 rounded-lg text-sm">
+                <input type="text" id="expDesc" placeholder="รายการ (เช่น ซื้อชุด, ค่าซัก)" class="border p-2 rounded-lg text-sm col-span-2">
+                <input type="number" id="expAmount" placeholder="ยอดเงิน" class="border p-2 rounded-lg text-sm">
+                <button onclick="addCashFlow('investment')" class="bg-purple-500 text-white rounded-lg text-sm hover:bg-purple-600">➕ ลงทุน</button>
+                <button onclick="addCashFlow('expense')" class="bg-red-500 text-white rounded-lg text-sm hover:bg-red-600">➖ รายจ่าย</button>
+            </div>
+        </div>
+
+        <div class="space-y-8">
+            <div class="bg-white p-4 rounded-xl shadow-md overflow-x-auto">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-2">
+                    <h3 class="font-bold text-gray-700">📦 รายการชุดในสต็อก & สถานะวันนี้</h3>
+                    <div class="flex items-center gap-3">
+                        <span id="itemCountDisplay" class="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-semibold">จำนวน: 0</span>
+                        <select id="categoryFilter" onchange="render()" class="border p-1 rounded-lg text-sm">
+                            <option value="all">ทั้งหมด</option>
+                        </select>
+                    </div>
+                </div>
+                <table class="w-full border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600">
+                            <th class="p-3">รูป</th>
+                            <th class="p-3 text-left">รายละเอียดชุด</th>
+                            <th class="p-3">หมวดหมู่</th>
+                            <th class="p-3">สถานะ (จองถึงวันไหน)</th>
+                            <th class="p-3">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockTable"></tbody>
+                </table>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-md overflow-x-auto border-t-4 border-orange-500">
+                <h3 class="font-bold text-orange-700 mb-4">📅 รายการเช่าประจำเดือนที่เลือก (ที่ยังไม่คืนชุด)</h3>
+                <table class="w-full border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-orange-50 text-orange-800">
+                            <th class="p-3 text-left">ชุด / ลูกค้า</th>
+                            <th class="p-3">วันที่เช่า-คืน</th>
+                            <th class="p-3 text-left">รายละเอียดการเงิน</th>
+                            <th class="p-3">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookingTable"></tbody>
+                </table>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-xl shadow-md overflow-x-auto text-white">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-gray-300">✅ ประวัติงาน (รายได้/รายจ่าย)</h3>
+                    <button onclick="clearAllHistory()" class="bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-red-700 transition">
+                        🗑️ Clear ประวัติ
+                    </button>
+                </div>
+                <table class="w-full border-collapse text-xs">
+                    <thead>
+                        <tr class="text-gray-400 border-b border-gray-700">
+                            <th class="p-2 text-left">วันที่</th>
+                            <th class="p-2 text-left">ประเภท</th>
+                            <th class="p-2 text-left">รายการ</th>
+                            <th class="p-2 text-right">จำนวน</th>
+                            <th class="p-2 text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stock = JSON.parse(localStorage.getItem('stock')) || [];
+        let bookings = JSON.parse(localStorage.getItem('bookings')) || [];
+        let cashFlow = JSON.parse(localStorage.getItem('cashFlow')) || [];
+        
+        // --- ส่วนที่แก้ไข: URL สำหรับเชื่อมต่อ Google Sheets ---
+        const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzh8iDq0a4ERf1UW1KsvLv48roArpZFUV_jAqCV6IaloCx9KaoQa9_uPASOmE7nl5MQzg/exec";
+
+        const now = new Date();
+        const currentMonthStr = now.toISOString().slice(0, 7);
+        document.getElementById('reportMonth').value = currentMonthStr;
+
+        // --- เพิ่มฟังก์ชันดึงข้อมูลจาก Sheets ---
+        function loadDataFromSheets() {
+            fetch(APP_SCRIPT_URL + "?action=getData")
+                .then(response => response.json())
+                .then(data => {
+                    stock = data.stock || [];
+                    bookings = data.bookings || [];
+                    cashFlow = data.cashFlow || [];
+                    localStorage.setItem('stock', JSON.stringify(stock));
+                    localStorage.setItem('bookings', JSON.stringify(bookings));
+                    localStorage.setItem('cashFlow', JSON.stringify(cashFlow));
+                    render();
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // --- เพิ่มฟังก์ชันส่งข้อมูลไป Sheets ---
+        function sendDataToSheets(action, data) {
+            fetch(APP_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: action, data: data })
+            });
+        }
+
+        function saveAll() {
+            localStorage.setItem('stock', JSON.stringify(stock));
+            localStorage.setItem('bookings', JSON.stringify(bookings));
+            localStorage.setItem('cashFlow', JSON.stringify(cashFlow));
+            render();
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit' });
+        }
+
+        function calculateTotalBooking(rent, dep, shipping) {
+            return (Number(rent) || 0) + (Number(dep) || 0) + (Number(shipping) || 0);
+        }
+
+        function addItem() {
+            const name = document.getElementById('name').value;
+            const imageFile = document.getElementById('imageInput').files[0];
+            const editIndex = document.getElementById('editIndex').value;
+            if (!name) return alert('ระบุชื่อสินค้า');
+
+            const saveAction = (img) => {
+                const data = {
+                    name,
+                    size: document.getElementById('size').value,
+                    category: document.getElementById('category').value,
+                    price1: Number(document.getElementById('price1').value) || 0,
+                    price3: Number(document.getElementById('price3').value) || 0,
+                    price5: Number(document.getElementById('price5').value) || 0,
+                    defaultDeposit: Number(document.getElementById('defaultDeposit').value) || 0,
+                    image: img
+                };
+                
+                if (editIndex === "-1") {
+                    stock.push(data);
+                    sendDataToSheets('addStock', data);
+                } else {
+                    if (!img) data.image = stock[editIndex].image;
+                    stock[editIndex] = data;
+                    sendDataToSheets('updateStock', {index: editIndex, data: data});
+                }
+                saveAll();
+                clearForm();
+            };
+
+            if (imageFile) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 200;
+                        const scaleSize = MAX_WIDTH / img.width;
+                        canvas.width = MAX_WIDTH;
+                        canvas.height = img.height * scaleSize;
+                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                        saveAction(canvas.toDataURL('image/jpeg', 0.5));
+                    };
+                };
+                reader.readAsDataURL(imageFile);
+            } else {
+                saveAction(null);
+            }
+        }
+
+        function editItem(index) {
+            const item = stock[index];
+            document.getElementById('name').value = item.name;
+            document.getElementById('size').value = item.size;
+            document.getElementById('category').value = item.category;
+            document.getElementById('price1').value = item.price1;
+            document.getElementById('price3').value = item.price3;
+            document.getElementById('price5').value = item.price5;
+            document.getElementById('defaultDeposit').value = item.defaultDeposit;
+            document.getElementById('editIndex').value = index;
+            document.getElementById('submitBtn').innerText = "แก้ไขสต็อก";
+            document.getElementById('cancelBtn').classList.remove('hidden');
+            window.scrollTo(0, 0);
+        }
+
+        function deleteItem(index) {
+            if(confirm(`ต้องการลบชุด "${stock[index].name}" ใช่หรือไม่?`)){
+                sendDataToSheets('deleteStock', index);
+                stock.splice(index, 1);
+                saveAll();
+            }
+        }
+
+        function clearForm() {
+            ['name', 'size', 'category', 'price1', 'price3', 'price5', 'defaultDeposit', 'imageInput', 'editIndex'].forEach(id => {
+                if(id === 'editIndex') document.getElementById(id).value = '-1';
+                else document.getElementById(id).value = '';
+            });
+            document.getElementById('submitBtn').innerText = "บันทึกสต็อก";
+            document.getElementById('cancelBtn').classList.add('hidden');
+        }
+
+        function openBooking(index) {
+            const item = stock[index];
+            const bookingForm = document.getElementById('bookingFormSection');
+            bookingForm.classList.remove('hidden');
+            document.getElementById('targetItemName').innerText = item.name;
+            document.getElementById('bookingItemId').value = index;
+            document.getElementById('rentPrice').value = item.price1;
+            document.getElementById('deposit').value = item.defaultDeposit;
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            document.getElementById('bookingDays').value = 0;
+            
+            document.getElementById('custName').value = '';
+            document.getElementById('custProvince').value = '';
+            document.getElementById('custPhone').value = '';
+            document.getElementById('custIdCard').value = '';
+            document.getElementById('shipping').value = '';
+
+            bookingForm.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function autoCalculateDays() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            if (start && end) {
+                const d1 = new Date(start);
+                const d2 = new Date(end);
+                const diffTime = Math.abs(d2 - d1);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                document.getElementById('bookingDays').value = diffDays;
+                manualCalculatePrice();
+            }
+        }
+
+        function manualCalculatePrice() {
+            const days = parseInt(document.getElementById('bookingDays').value) || 0;
+            const itemId = document.getElementById('bookingItemId').value;
+            const item = stock[itemId];
+            if (!item) return;
+            let price = 0;
+            if (days >= 5) price = item.price5;
+            else if (days >= 3) price = item.price3;
+            else if (days >= 1) price = item.price1;
+            document.getElementById('rentPrice').value = price;
+        }
+
+        function closeBooking() { document.getElementById('bookingFormSection').classList.add('hidden'); }
+
+        // --- แก้ไขฟังก์ชัน saveBooking ---
+        function saveBooking() {
+            const itemIndex = document.getElementById('bookingItemId').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            if (!start || !end) return alert('กรุณาระบุวันที่');
+
+            const bookingData = {
+                itemIndex,
+                customer: document.getElementById('custName').value,
+                province: document.getElementById('custProvince').value,
+                phone: document.getElementById('custPhone').value,
+                idCard: document.getElementById('custIdCard').value,
+                start: start,
+                end: end,
+                rent: Number(document.getElementById('rentPrice').value),
+                dep: Number(document.getElementById('deposit').value),
+                ship: Number(document.getElementById('shipping').value)
+            };
+
+            bookings.push(bookingData);
+            sendDataToSheets('addBooking', bookingData);
+            saveAll();
+            closeBooking();
+            alert('บันทึกการจองเรียบร้อย');
+        }
+
+        function closeJob(index) {
+            const b = bookings[index];
+            const item = stock[b.itemIndex];
+            if (confirm(`ปิดงาน: ${item.name} | ลูกค้า: ${b.customer}\nรายได้เช่า: ${b.rent}\nค่ามัดจำคืนลูกค้า: ${b.dep}`)) {
+                const cashData = {
+                    date: new Date().toISOString().split('T')[0],
+                    type: 'รายได้จากการเช่า',
+                    description: `${item.name} (${b.customer})`,
+                    amount: b.rent
+                };
+                cashFlow.push(cashData);
+                sendDataToSheets('addCashFlow', cashData);
+                
+                bookings.splice(index, 1);
+                sendDataToSheets('deleteBooking', index);
+                
+                saveAll();
+            }
+        }
+
+        function addCashFlow(type) {
+            const date = document.getElementById('expDate').value;
+            const desc = document.getElementById('expDesc').value;
+            const amount = Number(document.getElementById('expAmount').value);
+            if(!date || !amount) return alert('กรอกข้อมูลไม่ครบ');
+
+            let cashType = type === 'investment' ? 'เงินลงทุน' : 'รายจ่าย/ค่าใช้จ่าย';
+            let cashAmount = type === 'investment' ? amount : -amount;
+
+            const cashData = { date, type: cashType, description: desc, amount: cashAmount };
+            cashFlow.push(cashData);
+            sendDataToSheets('addCashFlow', cashData);
+            
+            saveAll();
+            ['expDate', 'expDesc', 'expAmount'].forEach(id => document.getElementById(id).value = '');
+        }
+
+        function deleteHistory(index) {
+            if(confirm("ต้องการลบประวัตินี้ใช่หรือไม่?")){
+                const reversedIndex = (cashFlow.length - 1) - index;
+                sendDataToSheets('deleteCashFlow', reversedIndex);
+                cashFlow.splice(reversedIndex, 1);
+                saveAll();
+            }
+        }
+        
+        function clearAllHistory() {
+            if(confirm("⚠️ คำเตือน: คุณต้องการลบข้อมูลประวัติรายได้/รายจ่ายทั้งหมดใช่หรือไม่? (ข้อมูลไม่สามารถกู้คืนได้)")){
+                sendDataToSheets('clearCashFlow', null);
+                cashFlow = [];
+                saveAll();
+            }
+        }
+
+        function getStatus(itemIndex) {
+            const activeBooking = bookings.find(b => b.itemIndex == itemIndex);
+            if (activeBooking) {
+                return `<div class="bg-red-100 text-red-700 px-2 py-1 rounded-lg text-[10px] font-bold text-center pulse-red">
+                            🔴 จอง: ${formatDate(activeBooking.start)} ถึง ${formatDate(activeBooking.end)}
+                        </div>`;
+            }
+            return `<span class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-[10px] font-bold text-center block">🟢 ว่าง</span>`;
+        }
+
+        function exportToExcelAll() {
+            if (cashFlow.length === 0 && bookings.length === 0) return alert('ไม่มีข้อมูลให้ Export');
+            let csv = '\ufeff';
+            csv += 'ประเภทข้อมูล,วันที่,ประเภท/ลูกค้า,จังหวัด,เบอร์โทรศัพท์,เลขบัตรประชาชน,ชุด,รายได้(+),รายจ่าย(-),ค่ามัดจำ,รวมโอน\n';
+            cashFlow.forEach(c => {
+                let income = c.amount > 0 && c.type === 'รายได้จากการเช่า' ? c.amount : '';
+                let expense = c.amount < 0 || c.type === 'เงินลงทุน' || c.type === 'รายจ่าย/ค่าใช้จ่าย' ? Math.abs(c.amount) : '';
+                csv += `การเงิน,${c.date},${c.type},,,,${c.description},${income},${expense},,\n`;
+            });
+            bookings.forEach(b => {
+                const itemName = stock[b.itemIndex] ? stock[b.itemIndex].name : 'Unknown';
+                const total = calculateTotalBooking(b.rent, b.dep, b.ship);
+                csv += `การจอง,${b.start} ถึง ${b.end},${b.customer},${b.province || '-'},${b.phone || '-'},${b.idCard || '-'},${itemName},${b.rent},,${b.dep},${total}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `rental_history_all.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function render() {
+            const reportMonth = document.getElementById('reportMonth').value;
+            const totalRent = cashFlow.filter(c => c.amount > 0 && c.type === 'รายได้จากการเช่า').reduce((sum, c) => sum + c.amount, 0);
+            const totalInv = cashFlow.filter(c => c.type === 'เงินลงทุน').reduce((sum, c) => sum + Math.abs(c.amount), 0);
+            const totalExp = cashFlow.filter(c => c.type === 'รายจ่าย/ค่าใช้จ่าย' || (c.amount < 0 && c.type !== 'เงินลงทุน')).reduce((sum, c) => sum + Math.abs(c.amount), 0);
+            const currentBalance = (totalInv + totalRent) - totalExp;
+            document.getElementById('totalRentIncome').innerText = totalRent.toLocaleString() + ".-";
+            document.getElementById('totalInvestment').innerText = totalInv.toLocaleString() + ".-";
+            document.getElementById('totalExpenses').innerText = totalExp.toLocaleString() + ".-";
+            document.getElementById('netProfit').innerText = (totalRent - totalExp).toLocaleString() + ".-";
+            document.getElementById('totalBalance').innerText = currentBalance.toLocaleString() + ".-";
+            const filter = document.getElementById('categoryFilter');
+            const currentVal = filter.value;
+            const categories = [...new Set(stock.map(item => item.category).filter(cat => cat))];
+            filter.innerHTML = '<option value="all">ทั้งหมด</option>';
+            categories.forEach(cat => {
+                filter.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+            filter.value = currentVal;
+            const itemCountDisplay = document.getElementById('itemCountDisplay');
+            let displayedItems = stock;
+            if (filter.value !== 'all') {
+                displayedItems = stock.filter(item => item.category === filter.value);
+            }
+            itemCountDisplay.innerText = `จำนวน: ${displayedItems.length} ตัว`;
+            const sTable = document.getElementById('stockTable');
+            sTable.innerHTML = '';
+            stock.forEach((item, i) => {
+                if (filter.value !== 'all' && item.category !== filter.value) return;
+                sTable.innerHTML += `
+                    <tr class="border-b text-center">
+                        <td class="p-2">${item.image ? `<img src="${item.image}" class="w-16 h-16 object-cover mx-auto rounded">` : '-'}</td>
+                        <td class="p-2 text-left">
+                            <div class="font-bold text-sm">${item.name}</div>
+                            <div class="text-xs text-blue-600">ไซส์: ${item.size}</div>
+                            <div class="text-[10px] text-gray-700 mt-1 space-x-1">
+                                <span class="bg-blue-50 px-1 rounded font-semibold">1วัน: ${item.price1}</span>
+                                <span class="bg-blue-50 px-1 rounded font-semibold">3วัน: ${item.price3}</span>
+                                <span class="bg-blue-50 px-1 rounded font-semibold">5วัน: ${item.price5}</span>
+                            </div>
+                            <div class="text-[10px] text-gray-500 mt-1">
+                                <span class="font-bold text-red-700">มัดจำ: ${item.defaultDeposit}</span>
+                            </div>
+                        </td>
+                        <td class="p-2 text-xs">${item.category}</td>
+                        <td class="p-2 w-48">${getStatus(i)}</td>
+                        <td class="p-2 space-y-1">
+                            <button onclick="openBooking(${i})" class="bg-orange-500 text-white px-2 py-1 rounded text-xs w-full">จอง</button>
+                            <button onclick="editItem(${i})" class="bg-blue-500 text-white px-2 py-1 rounded text-xs w-full">✏️ แก้ไข</button>
+                            <button onclick="deleteItem(${i})" class="bg-red-500 text-white px-2 py-1 rounded text-xs w-full">🗑️ ลบ</button>
+                        </td>
+                    </tr>`;
+            });
+            const bTable = document.getElementById('bookingTable');
+            bTable.innerHTML = '';
+            bookings.forEach((b, i) => {
+                const totalTransfer = calculateTotalBooking(b.rent, b.dep, b.ship);
+                bTable.innerHTML += `
+                    <tr class="border-b text-center">
+                        <td class="p-3 text-left">
+                            <div class="font-bold text-blue-700">${b.customer}</div>
+                            <div class="text-xs text-gray-600">${b.province || ''}</div>
+                            <div class="text-xs text-gray-600">${b.phone || ''}</div>
+                            <div class="font-bold text-gray-800 mt-1">${stock[b.itemIndex].name}</div>
+                        </td>
+                        <td class="p-3 text-xs">${formatDate(b.start)} - ${formatDate(b.end)}</td>
+                        <td class="p-3 text-left text-xs">
+                            เช่า: ${b.rent} | มัดจำ: ${b.dep} | ส่ง: ${b.ship}
+                            <div class="font-bold text-orange-700 mt-1 bg-orange-100 p-2 rounded text-sm">ยอดโอนรวม: ${totalTransfer.toLocaleString()} บาท</div>
+                        </td>
+                        <td class="p-3"><button onclick="closeJob(${i})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">คืนชุด</button></td>
+                    </tr>`;
+            });
+            const hTable = document.getElementById('historyTable');
+            hTable.innerHTML = '';
+            [...cashFlow].reverse().forEach((c, i) => {
+                const color = c.amount > 0 ? 'text-green-400' : 'text-red-400';
+                hTable.innerHTML += `
+                    <tr class="border-b border-gray-700">
+                        <td class="p-2">${c.date}</td>
+                        <td class="p-2">${c.type}</td>
+                        <td class="p-2">${c.description}</td>
+                        <td class="p-2 text-right ${color}">${c.amount.toLocaleString()}</td>
+                        <td class="p-2 text-center">
+                            <button onclick="deleteHistory(${i})" class="text-red-500 hover:text-red-300">🗑️</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+        
+        // --- ส่วนที่เพิ่ม: โหลดข้อมูลอัตโนมัติ ---
+        window.onload = function() {
+            loadDataFromSheets();
+        };
+    </script></body></html>
